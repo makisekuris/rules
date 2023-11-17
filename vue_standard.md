@@ -17,9 +17,11 @@
   - [组件内声明的事件回调函数，尽量不要用 onXXX。避免与 props 传入的回调函数混淆](#组件内声明的事件回调函数尽量不要用-onxxx避免与-props-传入的回调函数混淆)
   - [判断条件太长的时候建议进行封装后通过独立的函数或方法进行调用](#判断条件太长的时候建议进行封装后通过独立的函数或方法进行调用)
   - [异步逻辑使用顺序 async/await \> Promise \> callback](#异步逻辑使用顺序-asyncawait--promise--callback)
-  - [相互独立的异步时间应当考虑使用 promiseall](#相互独立的异步时间应当考虑使用-promiseall)
+  - [相互独立的异步时间应当考虑使用 Promise.all](#相互独立的异步时间应当考虑使用-promiseall)
   - [有魔法数的场合，多次使用应设定为变量。单次使用至少要标明原因](#有魔法数的场合多次使用应设定为变量单次使用至少要标明原因)
   - [接口类](#接口类)
+    - [通常情况下需要在 url 中传 query 类字段的一律 get](#通常情况下需要在-url-中传-query-类字段的一律-get)
+    - [在传 params 参数时，值为空或没有值的参数，不参与 url 的拼接](#在传-params-参数时值为空或没有值的参数不参与-url-的拼接)
 
 ## 通常使用组合式写法（setup + typescript），同时可备选选项式写法
 
@@ -360,7 +362,7 @@ get(
 );
 ```
 
-## 相互独立的异步时间应当考虑使用 promiseall
+## 相互独立的异步时间应当考虑使用 Promise.all
 
 ```ts
  //GOOD 请求之间没有依赖关系时应注重同步发出异步
@@ -426,5 +428,69 @@ const searchParamCache = ref<{ match: string; years: string }>({
 ## 接口类
 
 > ID 类，推荐用 string 类型，不推荐 number，超过 17 位的整数 js 会有精度丢失；
-> 时间类，推荐用毫秒时间戳（1609459200000），不推荐 string（'2021-01-01 08:00:00'），避免国际化时区造成的麻烦；
+
+> 时间类，推荐用毫秒时间戳（1609459200000），不推荐 string（'2021-01-01 08:00:00'
+
 > API URL 都以 /api/xxx 开头，其他地址留给前端页面，也方便设置代理；
+
+### 通常情况下需要在 url 中传 query 类字段的一律 get
+
+> 需要拼接 query 到 url 的是 get 请求的事情，post 都用 data 传 context 了，没有再加入 params 的必要
+
+```ts
+// BAD
+//
+// POST 接口需要将data传值放到url中以params拼接形式实现
+//
+export function collectTerm(termid: string) {
+  return defHttp.post<any>(
+    {
+      url: Api.collectTerm,
+      data: {
+        id: termid,
+      },
+    },
+    {
+      //数据拼接到url
+      joinParamsToUrl: true,
+    }
+  );
+}
+
+// GOOD
+
+export function searchTermWordDetail(
+  subjectId: string,
+  termName: string,
+  databaseId: string
+) {
+  return defHttp.get<searchDetailDataRes>({
+    url: Api.termWordDetail,
+    params: {
+      id: subjectId,
+      term: termName,
+      databaseId: databaseId,
+    },
+  });
+}
+```
+
+### 在传 params 参数时，值为空或没有值的参数，不参与 url 的拼接
+
+> 当需要 params 传值时，应将空的字符串自动省去，而不是拼接到 url 上（这点通常框架预封装方法会自动实现）
+>
+> 处理params的默认空值和可选传值是http框架的事情
+
+```log
+//BAD
+//
+// subjectIds、pubYears无值时不应进行拼接
+
+https://api.termonline.cn/main-serve/business/tm/tmWord/allSearch?term=脑梗死&match=1&pageNo=1&pageSize=5&subjectIds=&pubYears=
+
+//GOOD
+//
+// subjectIds、pubYears无值时不应进行拼接
+
+https://api.termonline.cn/main-serve/business/tm/tmWord/allSearch?term=脑梗死&match=1&pageNo=1&pageSize=5
+```
